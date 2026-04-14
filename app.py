@@ -57,12 +57,24 @@ if ticker:
         )
         st.stop()
 
+    # Let the user pick a moving-average window
+    ma_window = st.sidebar.slider(
+    "Moving Average Window (days)", min_value=5, max_value=200, value=50, step=5
+)
+
     # Flatten any multi-level columns that yfinance sometimes returns
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
 
     # -- Compute a derived column -------------------------
     df["Daily Return"] = df["Close"].pct_change()
+    df[f"{ma_window}-Day MA"] = df["Close"].rolling(window=ma_window).mean()
+    if ma_window > len(df):
+        st.warning(
+            f"The selected {ma_window}-day window is longer than the "
+            f"available data ({len(df)} trading days). The moving average "
+            "line won't appear — try a shorter window or a wider date range."
+        )    
 
     # -- Key metrics --------------------------------------
     latest_close = float(df["Close"].iloc[-1])
@@ -86,7 +98,7 @@ if ticker:
     st.divider()
 
     # -- Price chart --------------------------------------
-    st.subheader("Closing Price")
+    st.subheader("Price & Moving Average")
 
     fig = go.Figure()
     fig.add_trace(
@@ -96,6 +108,14 @@ if ticker:
             line=dict(width=1.5)
         )
     )
+    fig.add_trace(
+        go.Scatter(
+            x=df.index, y=df[f"{ma_window}-Day MA"],
+            mode="lines", name=f"{ma_window}-Day MA",
+            line=dict(width=2, dash="dash")
+        )
+    )
+
     fig.update_layout(
         yaxis_title="Price (USD)", xaxis_title="Date",
         template="plotly_white", height=450
